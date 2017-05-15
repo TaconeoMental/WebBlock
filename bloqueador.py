@@ -8,6 +8,8 @@ import os
 msje_ayuda = '''
 Programa que bloquea sitios por determinada cantidad de tiempo
 
+La lista de sitios a bloquear se encuentra en el archivo \"Páginas Web.txt\".
+
 blqueador.py [hr][m][s]
 
 Comandos:
@@ -15,8 +17,8 @@ Comandos:
     [hr]    Cantidad de horas en el temporizador
     [m]     Cantidad de segundos en el temporizador
     [s]     Cantidad de segundos en el temporizador
+    
 
-La lista de sitios 
 Ejemplos:
  
     bloqueador.py 3hr4m6s        Bloquea los sitios por 3 horas, 4 minutos y 6 segundos 
@@ -26,6 +28,8 @@ Ejemplos:
     bloqueador.py 30m50s         Bloquea los sitios por 30 minutos y 50 segundos
 '''
 
+
+##### Función que parsea input de tiempo y lo transforma en un objecto timedelta #####
 
 def syntax_tiempo(cadena_tiempo, patron_compilado):
     partes = patron_compilado.match(cadena_tiempo)
@@ -39,14 +43,30 @@ def syntax_tiempo(cadena_tiempo, patron_compilado):
     else:
         raise SyntaxError
 
+
+##### Función que devuelve un archivo a su estado original basándose en una copia temporal #####
+    
+def volver_original(original, copia, mensaje=""):
+    print(mensaje)
+    with open(copia, "r") as temp:
+        lineas = temp.readlines()
+        with open(original, "w") as hosts_or:
+            for linea in lineas:
+                hosts_or.writelines(linea)
+            hosts_or.close()
+        temp.close()
+    
+
+##### Clase que crea archivo temporales y los elimina #####
+        
 class Copia:
     def __init__(self, archivo):
+        self.ruta = archivo
         self.archivo = os.path.basename(os.path.splitext(archivo)[0])
         self.copia = self.archivo + "_temp"
 
     def copiar(self):
-
-        with open(self.archivo, "r") as original:
+        with open(self.ruta, "r") as original:
             with open(self.copia, "w") as copia:
                 copia.writelines(original.readlines())
                 copia.close()
@@ -71,52 +91,50 @@ def main():
     if len(argv) > 1:
 
         if argv[1] != "--help":
-
-            # delta_tiempo = syntax_tiempo(argv[1], patron_tiempo)
-            # if delta_tiempo == "0:00:00":
-            #     print("Ejecuta el comando \"python bloqueador.py --help\" para obtener ayuda.")
-            # else:
+            
             try:
-                tiempo_delta = delta_tiempo = syntax_tiempo(argv[1], patron_tiempo)
-            except Exception as e:
-                print("Ejecuta el comando \"python bloqueador.py --help\" para obtener ayuda.")
-                exit()
+                try:
+                    delta_tiempo = syntax_tiempo(argv[1], patron_tiempo)
+                except Exception as e:
+                    print("Ejecuta el comando \"python bloqueador.py --help\" para obtener ayuda.")
+                    exit()
 
-            print(delta_tiempo)
-            hora_fin = hora_com + delta_tiempo
+                print(delta_tiempo)
+                hora_fin = hora_com + delta_tiempo
 
-            hosts = Copia(ruta_hosts)
-            hosts.copiar()
+                hosts = Copia(ruta_hosts)
+                hosts.copiar()
 
-            ##### Añadir Páginas #####
-            with open("Páginas Web.txt", "r") as pag:
-                paginas = [linea.rstrip("\n") for linea in pag.readlines()]
-                pag.close()
-            with open(ruta_hosts, "a") as hosts_arch:
-                for pagina in paginas:
-                    hosts_arch.write("\n{} {}".format(redireccion, pagina))
-                hosts_arch.close()
+                ##### Añadir páginas al archivo "hosts" #####
+                with open("Páginas Web.txt", "r") as pag:
+                    paginas = [linea.rstrip("\n") for linea in pag.readlines()]
+                    pag.close()
+                with open(ruta_hosts, "a") as hosts_arch:
+                    for pagina in paginas:
+                        hosts_arch.write("\n{} {}".format(redireccion, pagina))
+                    hosts_arch.close()
 
+                ##### Checkear constantemente si ya se llegó a la hora final #####  
+                while True:
+                    if datetime.now() > hora_fin:
+                        print("wena prro")
+                        with open(hosts.copia, "r") as temp:
+                            lineas = temp.readlines()
+                            with open(ruta_hosts, "w") as hosts_or:
+                                for linea in lineas:
+                                    hosts_or.writelines(linea)
+                                hosts_or.close()
+                            temp.close()
 
-
-            while True:
-                if datetime.now() > hora_fin:
-                    # Desbloquear sitios
-                    print("wena prro")
-                    with open(hosts.copia, "r") as temp:
-                        lineas = temp.readlines()
-                        with open(ruta_hosts, "w") as hosts_or:
-                            for linea in lineas:
-                                hosts_or.writelines(linea)
-                            hosts_or.close()
-                        temp.close()
-
-                    hosts.eliminar()
-                    break
-
-        elif argv[1] == "--help":
-            print(msje_ayuda)
-
+                        hosts.eliminar()
+                        break
+                    
+            except KeyboardInterrupt:
+                volver_original(ruta_hosts, hosts.copia, mensaje="¡Ahora eres libre!")
+                    
+            elif argv[1] == "--help":
+                print(msje_ayuda)
+        
         else:
             print("Ejecuta el comando \"python bloqueador.py --help\" para obtener ayuda.")
 
